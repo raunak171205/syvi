@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KBC Quiz - Computer Vision</title>
+  <style>
+    body { 
+      font-family: 'Arial', sans-serif; 
+      background: #000; 
+      color: #fff; 
+      text-align: center; 
+      padding: 20px; 
+      margin: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #FFD700;
+      margin-bottom: 30px;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    }
+    .user-info {
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .question-box { 
+      background: linear-gradient(145deg, #1a1a1a, #2a2a2a);
+      padding: 25px;
+      border-radius: 10px;
+      margin: 20px auto;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    .options { 
+      margin-top: 25px;
+      text-align: left;
+    }
+    .option {
+      background: #333;
+      padding: 12px 15px;
+      margin: 10px 0;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .option:hover {
+      background: #444;
+      transform: translateX(5px);
+    }
+    .option input {
+      margin-right: 10px;
+      cursor: pointer;
+    }
+    button {
+      background: linear-gradient(to right, #FFD700, #FFA500);
+      color: #000;
+      border: none;
+      padding: 12px 30px;
+      font-size: 18px;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: bold;
+      transition: all 0.3s;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+    }
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+    button:disabled {
+      background: #555;
+      color: #888;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    #timer {
+      font-size: 28px;
+      color: #FFD700;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+    input[type="text"] {
+      padding: 10px 15px;
+      border-radius: 5px;
+      border: none;
+      margin: 10px;
+      width: 200px;
+      background: #333;
+      color: white;
+    }
+    .progress {
+      margin: 20px 0;
+      height: 5px;
+      background: #333;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(to right, #FFD700, #FFA500);
+      transition: width 0.5s;
+    }
+    .result-item {
+      margin: 15px 0;
+      padding: 10px;
+      border-radius: 5px;
+      background: #222;
+    }
+    .correct {
+      border-left: 5px solid #4CAF50;
+    }
+    .incorrect {
+      border-left: 5px solid #F44336;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Quiz on hand distance measurement</h1>
+    
+    <div id="userForm" class="user-info">
+      <h2>Please Enter Your Details</h2>
+      <input type="text" id="userName" placeholder="Your Name" required>
+      <input type="text" id="rollNumber" placeholder="Roll Number" required>
+      <button onclick="startQuiz()">Start Quiz</button>
+    </div>
+    
+    <div id="quiz" class="question-box" style="display: none;">
+      <div class="progress">
+        <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+      </div>
+      <div id="timer">Time Left: 10</div>
+      <div id="question" style="font-size: 20px; min-height: 80px;"></div>
+      <div class="options" id="options"></div>
+      <button id="submitBtn" onclick="submitAnswer()" disabled>Submit</button>
+    </div>
+    
+    <div id="results" class="question-box" style="display: none;">
+      <h2>Quiz Results</h2>
+      <div id="scoreDisplay" style="font-size: 24px; margin: 20px 0;"></div>
+      <div id="detailedResults"></div>
+      <button onclick="location.reload()">Take Quiz Again</button>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    // Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const questions = [
+      {
+        q: "1. If the focal length is miscalibrated to 500px instead of 1000px, how will distance measurements be affected?",
+        a: ["A) Distances will be halved", "B) Distances will be doubled", "C) No effect", "D) The app will crash"],
+        correct: "B"
+      },
+      {
+        q: "2. What happens if REAL_HAND_WIDTH is changed to 5cm but the actual hand width is 8.5cm?",
+        a: ["A) Distances underestimated by ~41%", "B) Value is ignored", "C) Only graph breaks", "D) Detection fails"],
+        correct: "A"
+      },
+      {
+        q: "3. Why does ctx.scale(-1, 1) flip the video horizontally?",
+        a: ["A) Corrects BGR to RGB", "B) Mirrors for user", "C) MediaPipe requirement", "D) Saves GPU"],
+        correct: "B"
+      },
+      {
+        q: "4. If minDetectionConfidence is 0.9, what is likely to happen?",
+        a: ["A) Faster but inaccurate", "B) Fewer false positives", "C) Focal length recalculates", "D) Only left hands"],
+        correct: "B"
+      },
+      {
+        q: "5. What happens if lastUpdateTime isn't updated?",
+        a: ["A) UI freezes", "B) Feed stops", "C) Focal resets", "D) Landmarks upside-down"],
+        correct: "A"
+      },
+      {
+        q: "6. Why use pointRadius: 0 on the line?",
+        a: ["A) Hide outliers", "B) Continuous line", "C) GPU load", "D) MediaPipe needs it"],
+        correct: "B"
+      },
+      {
+        q: "7. If HAND_CONNECTIONS is undefined, what happens?",
+        a: ["A) Runtime error", "B) Defaults used", "C) Bounding boxes", "D) Only fingertips"],
+        correct: "A"
+      },
+      {
+        q: "8. What if video.style.display = 'block' is removed?",
+        a: ["A) Video invisible", "B) Canvas stops", "C) Permission denied", "D) Text disappears"],
+        correct: "A"
+      },
+      {
+        q: "9. Reducing updateInterval to 50ms causes?",
+        a: ["A) Smoother UI, more CPU", "B) Fewer points", "C) Frequent FL calc", "D) Less accuracy"],
+        correct: "A"
+      },
+      {
+        q: "10. Why use facingMode: 'user'?",
+        a: ["A) Rear camera", "B) Mirror view", "C) Depth sensor", "D) GDPR"],
+        correct: "B"
+      },
+      {
+        q: "11. What if canvas.width isn't set?",
+        a: ["A) Misaligned coordinates", "B) Browser crash", "C) FL = 0", "D) Grayscale only"],
+        correct: "A"
+      },
+      {
+        q: "12. Why y-axis max is 200cm?",
+        a: ["A) Limit outliers", "B) Max visibility", "C) Detection range", "D) Two-digit limit"],
+        correct: "A"
+      },
+      {
+        q: "13. Removing position: sticky from <th> causes?",
+        a: ["A) Header scrolls", "B) Table collapses", "C) Wrong distance", "D) Warning"],
+        correct: "A"
+      },
+      {
+        q: "14. If hands.send() fails silently, debug how?",
+        a: ["A) Check video size", "B) Verify hands init", "C) Lower confidence", "D) Static image"],
+        correct: "B"
+      },
+      {
+        q: "15. What prevents malicious camera access?",
+        a: ["A) HTTPS & permission", "B) 3 retry limit", "C) Face auth", "D) WASM sandbox"],
+        correct: "A"
+      }
+    ];
+
+    let currentQ = 0;
+    let score = 0;
+    let answers = [];
+    let timer;
+    let seconds = 10;
+    let userName = "";
+    let rollNumber = "";
+
+    const userForm = document.getElementById('userForm');
+    const quizDiv = document.getElementById('quiz');
+    const resultsDiv = document.getElementById('results');
+    const questionDiv = document.getElementById('question');
+    const optionsDiv = document.getElementById('options');
+    const timerDiv = document.getElementById('timer');
+    const progressBar = document.getElementById('progressBar');
+    const submitBtn = document.getElementById('submitBtn');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const detailedResults = document.getElementById('detailedResults');
+
+    // Show user form on load
+    userForm.style.display = 'block';
+
+    function startQuiz() {
+      userName = document.getElementById('userName').value.trim();
+      rollNumber = document.getElementById('rollNumber').value.trim();
+      
+      if (!userName || !rollNumber) {
+        alert("Please enter both your name and roll number");
+        return;
+      }
+      
+      userForm.style.display = 'none';
+      quizDiv.style.display = 'block';
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      if (currentQ >= questions.length) return endQuiz();
+
+      // Update progress bar
+      progressBar.style.width = `${(currentQ / questions.length) * 100}%`;
+      
+      // Reset timer
+      seconds = 10;
+      updateTimer();
+      clearInterval(timer);
+      timer = setInterval(() => {
+        seconds--;
+        updateTimer();
+        if (seconds === 0) {
+          clearInterval(timer);
+          submitAnswer(true); // auto submit when time runs out
+        }
+      }, 1000);
+
+      const q = questions[currentQ];
+      questionDiv.innerText = q.q;
+      optionsDiv.innerHTML = "";
+      
+      // Create options with better styling
+      q.a.forEach((opt, i) => {
+        const value = String.fromCharCode(65 + i); // A, B, C, D
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'option';
+        optionDiv.innerHTML = `
+          <input type="radio" name="option" id="opt${value}" value="${value}" />
+          <label for="opt${value}">${opt}</label>
+        `;
+        optionDiv.addEventListener('click', function() {
+          this.querySelector('input').checked = true;
+          submitBtn.disabled = false;
+        });
+        optionsDiv.appendChild(optionDiv);
+      });
+      
+      submitBtn.disabled = true;
+    }
+
+    function updateTimer() {
+      timerDiv.innerText = `Time Left: ${seconds}`;
+      
+      // Change color when time is running out
+      if (seconds <= 5) {
+        timerDiv.style.color = '#FF5555';
+        timerDiv.style.animation = 'pulse 0.5s infinite alternate';
+      } else {
+        timerDiv.style.color = '#FFD700';
+        timerDiv.style.animation = 'none';
+      }
+    }
+
+    function submitAnswer(auto = false) {
+      clearInterval(timer);
+      
+      const selected = document.querySelector('input[name="option"]:checked');
+      const selectedValue = selected ? selected.value : "NA";
+      const correct = questions[currentQ].correct;
+      const isCorrect = selectedValue === correct;
+
+      if (isCorrect) score++;
+      
+      answers.push({
+        question: questions[currentQ].q,
+        selected: selectedValue,
+        correct: correct,
+        isCorrect: isCorrect
+      });
+
+      currentQ++;
+      loadQuestion();
+    }
+
+    function endQuiz() {
+      quizDiv.style.display = 'none';
+      resultsDiv.style.display = 'block';
+      
+      // Display score
+      scoreDisplay.innerHTML = `
+        <p>Name: <strong>${userName}</strong></p>
+        <p>Roll Number: <strong>${rollNumber}</strong></p>
+        <p>Your Score: <strong>${score}/${questions.length}</strong> (${Math.round((score/questions.length)*100)}%)</p>
+      `;
+      
+      // Display detailed results
+      detailedResults.innerHTML = '<h3>Question-wise Results:</h3>';
+      answers.forEach((answer, index) => {
+        const resultItem = document.createElement('div');
+        resultItem.className = `result-item ${answer.isCorrect ? 'correct' : 'incorrect'}`;
+        resultItem.innerHTML = `
+          <p><strong>Q${index+1}:</strong> ${answer.question}</p>
+          <p>Your answer: ${answer.selected} ${answer.isCorrect ? '✅' : '❌'}</p>
+          ${!answer.isCorrect ? `<p>Correct answer: ${answer.correct}</p>` : ''}
+        `;
+        detailedResults.appendChild(resultItem);
+      });
+      
+      // Store result in Firebase
+      const participantID = "user_" + Date.now();
+      db.ref("quizResults/" + participantID).set({
+        timestamp: new Date().toISOString(),
+        name: userName,
+        rollNumber: rollNumber,
+        score: score,
+        totalQuestions: questions.length,
+        percentage: Math.round((score/questions.length)*100),
+        responses: answers
+      }).then(() => {
+        console.log("Results saved to Firebase");
+      }).catch((error) => {
+        console.error("Error saving to Firebase:", error);
+      });
+    }
+  </script>
+</body>
+</html>
